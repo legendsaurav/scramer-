@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
-import { createClient, User as SupabaseUser } from '@supabase/supabase-js';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 import { User, UserRole } from '../types';
+import { supabase, CONFIG_ERROR_MESSAGE, siteUrl } from '../lib/supabaseClient';
 
 const SESSION_KEY = 'schmer_session_v1';
 
@@ -10,19 +11,6 @@ type AuthResult = {
   message?: string;
   autoLogin?: boolean;
 };
-
-const sanitizeUrl = (value?: string) => (value ? value.trim().replace(/\/$/, '') : undefined);
-const sanitizeKey = (value?: string) => value?.trim();
-
-const supabaseUrl = sanitizeUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
-const supabaseAnonKey = sanitizeKey(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
-
-const defaultSiteUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-const siteUrl = sanitizeUrl(import.meta.env.VITE_SITE_URL as string | undefined) || defaultSiteUrl;
-
-const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
 
 const interpretAuthError = (error: unknown): string => {
   if (!error) return 'Unexpected authentication error.';
@@ -65,9 +53,6 @@ const mapSupabaseUser = (user: SupabaseUser): User => ({
   avatar: user.user_metadata?.avatar_url || `https://picsum.photos/seed/${user.id}/200/200`,
   role: (user.user_metadata?.role as UserRole) || UserRole.MEMBER
 });
-
-const CONFIG_ERROR_MESSAGE =
-  'Supabase credentials are missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables (Vercel → Settings → Environment Variables) and redeploy.';
 
 export const useAuth = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);

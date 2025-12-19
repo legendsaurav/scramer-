@@ -73,6 +73,17 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   type: 'text' | 'system';
+  editedAt?: string;
+  userName?: string;
+  avatar?: string;
+}
+
+export interface DraftMessage {
+  projectId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  updatedAt: string;
 }
 
 export interface Reaction {

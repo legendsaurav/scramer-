@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppState, ViewState } from './types';
-import { MOCK_PROJECTS, MOCK_MEETINGS, MOCK_SESSIONS, MOCK_CHAT, MOCK_ANNOUNCEMENTS } from './constants';
+import { MOCK_PROJECTS, MOCK_MEETINGS, MOCK_SESSIONS, MOCK_ANNOUNCEMENTS } from './constants';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ProjectDetail from './components/ProjectDetail';
 import LoginPage from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
+import { useRealtimeChat } from './hooks/useRealtimeChat';
 
 function App() {
   const auth = useAuth();
@@ -108,6 +109,17 @@ function App() {
     ? MOCK_PROJECTS.find(p => p.id === state.selectedProjectId)
     : null;
 
+  const {
+    messages: projectChats,
+    drafts: projectDrafts,
+    currentDraft,
+    sendMessage: handleSendChatMessage,
+    editMessage: handleEditChatMessage,
+    saveDraft: handleDraftChange,
+    canEditMessage,
+    editWindowMs
+  } = useRealtimeChat(currentProject?.id ?? null, resolvedUser);
+
   return (
     <Layout 
       user={resolvedUser} 
@@ -140,7 +152,14 @@ function App() {
           project={currentProject}
           meetings={MOCK_MEETINGS.filter(m => m.projectId === currentProject.id)}
           sessions={MOCK_SESSIONS.filter(s => s.projectId === currentProject.id)}
-          chatMessages={MOCK_CHAT.filter(c => c.projectId === currentProject.id)}
+          chatMessages={projectChats}
+          chatDrafts={projectDrafts}
+          currentDraft={currentDraft}
+          onSendChatMessage={handleSendChatMessage}
+          onEditChatMessage={handleEditChatMessage}
+          onDraftChange={handleDraftChange}
+          canEditMessage={canEditMessage}
+          editWindowMs={editWindowMs}
           announcements={MOCK_ANNOUNCEMENTS.filter(a => a.projectId === currentProject.id)}
           currentUserId={resolvedUser.id}
           showProfileSidebar={showProfileSidebar}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Project, MeetingRecording, SoftwareSession, ChatMessage, Announcement } from '../types';
+import { Project, MeetingRecording, SoftwareSession, ChatMessage, Announcement, DraftMessage } from '../types';
 import { SOFTWARE_TOOLS } from '../constants';
 import { 
   Video, Calendar, MapPin, Mail, Phone, ChevronRight, X, Layers, Zap, HelpCircle, Download, CheckCircle
@@ -14,6 +14,13 @@ interface ProjectDetailProps {
   meetings: MeetingRecording[];
   sessions: SoftwareSession[];
   chatMessages: ChatMessage[];
+  chatDrafts: DraftMessage[];
+  currentDraft: string;
+  onSendChatMessage: (content: string) => void | Promise<void>;
+  onEditChatMessage: (messageId: string, content: string) => boolean | Promise<boolean>;
+  onDraftChange: (value: string) => void | Promise<void>;
+  canEditMessage: (message: ChatMessage, userId: string) => boolean;
+  editWindowMs: number;
   announcements: Announcement[];
   currentUserId: string;
   showProfileSidebar: boolean;
@@ -29,6 +36,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   meetings, 
   sessions,
   chatMessages,
+  chatDrafts,
+  currentDraft,
+  onSendChatMessage,
+  onEditChatMessage,
+  onDraftChange,
+  canEditMessage,
+  editWindowMs,
   announcements,
   currentUserId,
   showProfileSidebar,
@@ -119,7 +133,17 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
          </button>
        </div>
        <div className="flex-1 overflow-hidden">
-         <ChatInterface messages={chatMessages} currentUserId={currentUserId} />
+         <ChatInterface 
+           messages={chatMessages}
+           currentUserId={currentUserId}
+           onSendMessage={onSendChatMessage}
+           onEditMessage={onEditChatMessage}
+           onDraftChange={onDraftChange}
+           drafts={chatDrafts}
+           currentDraft={currentDraft}
+           canEditMessage={canEditMessage}
+           editWindowMs={editWindowMs}
+         />
        </div>
     </div>
   );
@@ -383,7 +407,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       </div>
 
       {/* Sliding RIGHT DRAWER: Chats */}
-      <div className={`fixed top-20 bottom-0 right-0 w-80 z-40 transform transition-transform duration-300 ease-out ${showChatSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-20 bottom-0 right-0 w-96 z-40 transform transition-transform duration-300 ease-out ${showChatSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
         <ChatsColumn />
       </div>
 

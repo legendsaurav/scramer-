@@ -1,4 +1,4 @@
-import { User, UserRole, Project, MeetingRecording, SoftwareSession, Announcement, ChatMessage, SoftwareType, SoftwareToolConfig } from './types';
+import { User, UserRole, Project, MeetingRecording, SoftwareSession, Announcement, SoftwareType, SoftwareToolConfig } from './types';
 
 // Software Configuration
 export const SOFTWARE_TOOLS: SoftwareToolConfig[] = [
@@ -141,12 +141,4 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
       { emoji: '✅', count: 3, userReacted: true }
     ]
   }
-];
-
-// Mock Chat
-export const MOCK_CHAT: ChatMessage[] = [
-  { id: 'c1', projectId: 'p1', userId: 'u2', content: 'Hey Alex, did you check the interference on the battery mount?', timestamp: '2023-10-24T11:00:00Z', type: 'text' },
-  { id: 'c2', projectId: 'p1', userId: 'u1', content: 'Checking now. I think we have 2mm clearance.', timestamp: '2023-10-24T11:02:00Z', type: 'text' },
-  { id: 'c3', projectId: 'p1', userId: 'u2', content: 'That might be too tight with thermal expansion.', timestamp: '2023-10-24T11:03:00Z', type: 'text' },
-  { id: 'c4', projectId: 'p1', userId: 'u1', content: 'Agreed. I will move it 1mm outward.', timestamp: '2023-10-24T11:05:00Z', type: 'text' },
 ];
