@@ -17,6 +17,9 @@ const sanitizeKey = (value?: string) => value?.trim();
 const supabaseUrl = sanitizeUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 const supabaseAnonKey = sanitizeKey(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
 
+const defaultSiteUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+const siteUrl = sanitizeUrl(import.meta.env.VITE_SITE_URL as string | undefined) || defaultSiteUrl;
+
 const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
@@ -150,6 +153,7 @@ export const useAuth = () => {
         email,
         password,
         options: {
+          emailRedirectTo: siteUrl,
           data: {
             full_name: name,
             password_hint: hint,

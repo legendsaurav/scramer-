@@ -93,7 +93,7 @@ export interface Announcement {
 export type ViewState = 'DASHBOARD' | 'PROJECT_DETAIL';
 
 export interface AppState {
-  currentUser: User;
+  currentUser: User | null;
   currentView: ViewState;
   selectedProjectId: string | null;
   activeTab: 'overview' | 'meetings' | 'sessions' | 'chat' | 'announcements';

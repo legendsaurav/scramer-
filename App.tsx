@@ -12,7 +12,7 @@ function App() {
   const auth = useAuth();
   
   const [state, setState] = useState<AppState>({
-    currentUser: auth.currentUser!, // Will be updated by effect
+    currentUser: auth.currentUser ?? null,
     currentView: 'DASHBOARD',
     selectedProjectId: null,
     activeTab: 'overview',
@@ -26,7 +26,7 @@ function App() {
     if (!auth.currentUser) return;
     setState(prev => ({
       ...prev,
-      currentUser: auth.currentUser!,
+      currentUser: auth.currentUser,
       currentView: 'DASHBOARD',
       selectedProjectId: null
     }));
@@ -34,9 +34,7 @@ function App() {
 
   // Sync auth user with app state
   useEffect(() => {
-    if (auth.currentUser) {
-      setState(prev => ({ ...prev, currentUser: auth.currentUser! }));
-    }
+    setState(prev => ({ ...prev, currentUser: auth.currentUser }));
   }, [auth.currentUser]);
 
   // Apply dark mode class to html element
@@ -95,6 +93,16 @@ function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} authHook={auth} />;
   }
 
+  const resolvedUser = state.currentUser ?? auth.currentUser;
+
+  if (!resolvedUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
+        <p className="text-sm tracking-widest uppercase">Preparing workspace...</p>
+      </div>
+    );
+  }
+
   // derived state for current project view
   const currentProject = state.selectedProjectId 
     ? MOCK_PROJECTS.find(p => p.id === state.selectedProjectId)
@@ -102,7 +110,7 @@ function App() {
 
   return (
     <Layout 
-      user={state.currentUser} 
+      user={resolvedUser} 
       darkMode={state.darkMode} 
       toggleDarkMode={toggleDarkMode}
       currentView={state.currentView}
@@ -121,7 +129,7 @@ function App() {
 
       {state.currentView === 'DASHBOARD' && (
         <Dashboard 
-          user={state.currentUser} 
+          user={resolvedUser} 
           projects={MOCK_PROJECTS}
           onSelectProject={handleSelectProject}
         />
@@ -134,7 +142,7 @@ function App() {
           sessions={MOCK_SESSIONS.filter(s => s.projectId === currentProject.id)}
           chatMessages={MOCK_CHAT.filter(c => c.projectId === currentProject.id)}
           announcements={MOCK_ANNOUNCEMENTS.filter(a => a.projectId === currentProject.id)}
-          currentUserId={state.currentUser.id}
+          currentUserId={resolvedUser.id}
           showProfileSidebar={showProfileSidebar}
           showChatSidebar={showChatSidebar}
           onCloseProfile={() => setShowProfileSidebar(false)}
