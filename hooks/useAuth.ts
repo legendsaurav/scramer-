@@ -17,11 +17,9 @@ const sanitizeKey = (value?: string) => value?.trim();
 const supabaseUrl = sanitizeUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 const supabaseAnonKey = sanitizeKey(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 const interpretAuthError = (error: unknown): string => {
   if (!error) return 'Unexpected authentication error.';
@@ -65,11 +63,20 @@ const mapSupabaseUser = (user: SupabaseUser): User => ({
   role: (user.user_metadata?.role as UserRole) || UserRole.MEMBER
 });
 
+const CONFIG_ERROR_MESSAGE =
+  'Supabase credentials are missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables (Vercel → Settings → Environment Variables) and redeploy.';
+
 export const useAuth = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [configError] = useState<string | null>(() => (!supabase ? CONFIG_ERROR_MESSAGE : null));
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     const init = async () => {
       const storedUser = localStorage.getItem(SESSION_KEY);
       if (storedUser) {
@@ -104,6 +111,10 @@ export const useAuth = () => {
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
+    if (!supabase) {
+      return { success: false, message: CONFIG_ERROR_MESSAGE };
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
@@ -130,6 +141,10 @@ export const useAuth = () => {
     password: string,
     hint: string
   ): Promise<AuthResult> => {
+    if (!supabase) {
+      return { success: false, message: CONFIG_ERROR_MESSAGE };
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -165,6 +180,9 @@ export const useAuth = () => {
   };
 
   const logout = async () => {
+    if (!supabase) {
+      return;
+    }
     await supabase.auth.signOut();
     setCurrentUser(null);
     localStorage.removeItem(SESSION_KEY);
@@ -177,6 +195,8 @@ export const useAuth = () => {
   return {
     currentUser,
     loading,
+    configured: !!supabase,
+    configError,
     login,
     register,
     logout,

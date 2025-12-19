@@ -71,6 +71,17 @@ function App() {
     setState(prev => ({ ...prev, darkMode: !prev.darkMode }));
   };
 
+  if (!auth.configured) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-slate-100 px-4 text-center">
+        <p className="text-base font-semibold tracking-wide text-red-300 mb-3">Supabase not configured</p>
+        <p className="text-sm text-slate-400 max-w-lg">
+          {auth.configError || 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables (for Vercel: Project → Settings → Environment Variables) and redeploy.'}
+        </p>
+      </div>
+    );
+  }
+
   if (auth.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
