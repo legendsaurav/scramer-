@@ -33,6 +33,20 @@ function App() {
     }));
   };
 
+  const resolvedUser = state.currentUser ?? auth.currentUser;
+  const selectedProjectId = state.selectedProjectId;
+
+  const {
+    messages: projectChats,
+    drafts: projectDrafts,
+    currentDraft,
+    sendMessage: handleSendChatMessage,
+    editMessage: handleEditChatMessage,
+    saveDraft: handleDraftChange,
+    canEditMessage,
+    editWindowMs
+  } = useRealtimeChat(selectedProjectId ?? null, resolvedUser);
+
   // Sync auth user with app state
   useEffect(() => {
     setState(prev => ({ ...prev, currentUser: auth.currentUser }));
@@ -94,8 +108,6 @@ function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} authHook={auth} />;
   }
 
-  const resolvedUser = state.currentUser ?? auth.currentUser;
-
   if (!resolvedUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
@@ -105,20 +117,9 @@ function App() {
   }
 
   // derived state for current project view
-  const currentProject = state.selectedProjectId 
-    ? MOCK_PROJECTS.find(p => p.id === state.selectedProjectId)
+  const currentProject = selectedProjectId 
+    ? MOCK_PROJECTS.find(p => p.id === selectedProjectId)
     : null;
-
-  const {
-    messages: projectChats,
-    drafts: projectDrafts,
-    currentDraft,
-    sendMessage: handleSendChatMessage,
-    editMessage: handleEditChatMessage,
-    saveDraft: handleDraftChange,
-    canEditMessage,
-    editWindowMs
-  } = useRealtimeChat(currentProject?.id ?? null, resolvedUser);
 
   return (
     <Layout 
