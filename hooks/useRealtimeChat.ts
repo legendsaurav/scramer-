@@ -170,8 +170,8 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
             return sortDrafts([...filtered, incoming]);
           });
 
-          if (currentUser && payload.new?.user_id === currentUser.id) {
-            setCurrentDraft(payload.new?.content || '');
+          if (currentUser && (payload.new as DraftRow)?.user_id === currentUser.id) {
+            setCurrentDraft((payload.new as DraftRow)?.content || '');
           }
         }
       )
