@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { ChatMessage, DraftMessage, User } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000;
 
@@ -66,7 +66,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
   );
 
   useEffect(() => {
-    if (!projectId || !supabase) {
+    if (!projectId || !supabase || !isSupabaseConfigured) {
       setMessages([]);
       setDrafts([]);
       setCurrentDraft('');
@@ -117,7 +117,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
   }, [projectId, currentUser?.id]);
 
   useEffect(() => {
-    if (!projectId || !supabase) return;
+    if (!projectId || !supabase || !isSupabaseConfigured) return;
 
     const channel = supabase
       .channel(`chat-messages-${projectId}`)
@@ -150,7 +150,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
   }, [projectId]);
 
   useEffect(() => {
-    if (!projectId || !supabase) return;
+    if (!projectId || !supabase || !isSupabaseConfigured) return;
 
     const channel = supabase
       .channel(`chat-drafts-${projectId}`)
@@ -184,7 +184,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!projectId || !currentUser || !supabase) return;
+      if (!projectId || !currentUser || !supabase || !isSupabaseConfigured) return;
       const trimmed = content.trim();
       if (!trimmed) return;
 
@@ -212,7 +212,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
 
   const editMessage = useCallback(
     async (messageId: string, content: string) => {
-      if (!projectId || !currentUser || !supabase) return false;
+      if (!projectId || !currentUser || !supabase || !isSupabaseConfigured) return false;
       const trimmed = content.trim();
       if (!trimmed) return false;
 
@@ -234,7 +234,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
   const saveDraft = useCallback(
     async (value: string) => {
       setCurrentDraft(value);
-      if (!projectId || !currentUser || !supabase) return;
+      if (!projectId || !currentUser || !supabase || !isSupabaseConfigured) return;
 
       const trimmed = value.trim();
       if (!trimmed) {

@@ -1,167 +1,264 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+import React, { useEffect, useRef, useState } from 'react';
+// Recharts is loaded lazily via LazyBarChart to avoid early size warnings
+import LazyBarChart from './LazyBarChart';
 import { Project, User } from '../types';
-import { Clock, Users, Video, Activity, ArrowRight, PlayCircle, Zap } from 'lucide-react';
+import { 
+  Clock, Users, Video, Activity, ArrowRight, Zap, Plus, 
+  Terminal, ShieldCheck, Cpu, LayoutGrid, ListFilter,
+  ArrowUpRight, Monitor, Command
+} from 'lucide-react';
 
 interface DashboardProps {
   user: User;
   projects: Project[];
   onSelectProject: (id: string) => void;
+  onCreateProject: (name: string, description: string) => void;
 }
 
-const data = [
-  { name: 'Mon', hours: 4.5 },
-  { name: 'Tue', hours: 6.2 },
-  { name: 'Wed', hours: 3.8 },
-  { name: 'Thu', hours: 8.5 },
-  { name: 'Fri', hours: 5.1 },
-];
+const emptyData = Array(14).fill(0).map((_, i) => ({ name: i, hours: 0 }));
 
-const Dashboard: React.FC<DashboardProps> = ({ user, projects, onSelectProject }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, projects, onSelectProject, onCreateProject }) => {
+  const [isCreating, setIsCreating] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const w = Math.floor(entry.contentRect.width);
+        setChartWidth(w);
+      }
+    });
+    ro.observe(el);
+    setChartWidth(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+
+  const handleQuickCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+    onCreateProject(newProjectName, newProjectDesc);
+    setNewProjectName('');
+    setNewProjectDesc('');
+    setIsCreating(false);
+  };
+
   return (
-    <div className="h-full overflow-y-auto p-6 lg:p-10">
-      <div className="max-w-7xl mx-auto space-y-10 pb-10">
+    <div className="h-full overflow-y-auto custom-scrollbar">
+      <div className="max-w-[1600px] mx-auto p-6 lg:p-12 space-y-10 pb-24">
         
-        {/* Welcome Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Good Morning, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500">{user.name.split(' ')[0]}</span>
+        {/* Superior Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-slate-200 dark:border-slate-800 pb-10">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-black uppercase tracking-widest rounded flex items-center gap-1.5">
+                <ShieldCheck size={12} />
+                Kernel v4.2 Secure
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">• Engineering Intelligence</span>
+            </div>
+            <h1 className="text-5xl font-extrabold text-slate-900 dark:text-white tracking-tighter">
+              Mission <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Control</span>
             </h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg">Your engineering workspace is ready.</p>
+            <p className="text-slate-500 dark:text-slate-400 font-medium text-lg">
+              System initialized for <span className="text-slate-900 dark:text-slate-200 font-bold">{user.name}</span>.
+            </p>
           </div>
-          <div className="text-sm text-slate-400 font-mono bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-            {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          
+          <div className="flex items-center gap-4">
+             <button 
+              onClick={() => setIsCreating(true)}
+              className="bg-slate-900 dark:bg-white text-white dark:text-slate-950 px-8 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 shadow-2xl shadow-blue-500/20 hover:-translate-y-1 transition-all active:scale-95"
+            >
+              <Plus size={20} />
+              Initialize Project
+            </button>
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* High-Precision Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: 'Active Projects', value: '3', icon: Activity, color: 'text-blue-400', from: 'from-blue-500/20', to: 'to-blue-600/5' },
-            { label: 'Hours Recorded', value: '28.5', icon: Clock, color: 'text-emerald-400', from: 'from-emerald-500/20', to: 'to-emerald-600/5' },
-            { label: 'Team Members', value: '12', icon: Users, color: 'text-purple-400', from: 'from-purple-500/20', to: 'to-purple-600/5' },
-            { label: 'Meetings Synced', value: '8', icon: Video, color: 'text-orange-400', from: 'from-orange-500/20', to: 'to-orange-600/5' },
+            { label: 'Active Initiatives', value: projects.length, icon: Cpu, color: 'text-blue-500', bg: 'bg-blue-500/5' },
+            { label: 'Weekly Velocity', value: '0.0h', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-500/5' },
+            { label: 'Syncing Nodes', value: '01', icon: Users, color: 'text-purple-500', bg: 'bg-purple-500/5' },
+            { label: 'Latency', value: '0ms', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/5' },
           ].map((stat, i) => (
-            <div key={i} className="group relative bg-white dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-300 overflow-hidden">
-              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.from} ${stat.to} rounded-bl-[100px] -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500`}></div>
-              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 ${stat.color}`}>
-                    <stat.icon size={22} />
-                  </div>
-                  <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">+2.5%</span>
+            <div key={i} className="glass-card rounded-[2rem] p-8 group hover:tech-border transition-all duration-300">
+              <div className="flex justify-between items-start mb-6">
+                <div className={`p-4 rounded-2xl ${stat.bg} ${stat.color}`}>
+                  <stat.icon size={24} />
                 </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">{stat.value}</p>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">{stat.label}</p>
+                <div className="flex flex-col items-end">
+                   <ArrowUpRight size={18} className="text-slate-300 dark:text-slate-700" />
+                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Status: OK</span>
+                </div>
               </div>
+              <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-1 font-mono">{stat.value}</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Projects List */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 pt-4">
+          
+          {/* Main Workspace Column */}
+          <div className="lg:col-span-8 space-y-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Zap className="text-amber-400" size={20} /> Active Projects
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                <Command size={24} className="text-blue-500" /> Workspace Archive
               </h2>
-              <button className="text-sm text-blue-600 hover:text-blue-500 font-semibold hover:underline decoration-2 underline-offset-4">View All</button>
-            </div>
-            <div className="grid gap-5">
-              {projects.map(project => (
-                <div 
-                  key={project.id}
-                  onClick={() => onSelectProject(project.id)}
-                  className="group relative bg-white dark:bg-slate-900/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-blue-500/30 transition-all cursor-pointer overflow-hidden"
-                >
-                  <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">{project.name}</h3>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          project.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {project.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{project.description}</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-6">
-                      <div className="flex -space-x-2">
-                         {project.members.map((m, i) => (
-                           <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-medium relative z-10">
-                              {i < 2 ? <img src={`https://picsum.photos/seed/${m}/100/100`} className="w-full h-full rounded-full" /> : `+${project.members.length - 2}`}
-                           </div>
-                         ))}
-                      </div>
-                      <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                        <ArrowRight size={16} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Activity Chart & Feature Card */}
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Productivity</h2>
-            
-            {/* Chart Card */}
-            <div className="bg-white dark:bg-slate-900/80 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-72">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Software Sessions (Hours)</h3>
-              <ResponsiveContainer width="100%" height="80%">
-                <BarChart data={data}>
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }} 
-                    dy={10}
-                  />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(59, 130, 246, 0.1)', radius: 4 }}
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                  />
-                  <Bar dataKey="hours" radius={[6, 6, 6, 6]} barSize={32}>
-                    {data.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.hours > 6 ? 'url(#colorGradient)' : '#e2e8f0'} className="dark:fill-slate-700" />
-                    ))}
-                  </Bar>
-                  <defs>
-                    <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#6366f1" stopOpacity={1}/>
-                    </linearGradient>
-                  </defs>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Feature Card */}
-            <div className="group relative overflow-hidden rounded-2xl p-6 shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-700"></div>
-              <div className="absolute -right-10 -bottom-10 opacity-20 transform rotate-12 group-hover:scale-110 transition-transform duration-700">
-                <Video size={160} />
-              </div>
-              
-              <div className="relative z-10 text-white">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span>
-                  <span className="text-xs font-bold bg-white/10 px-2 py-0.5 rounded uppercase tracking-wider">Processing</span>
-                </div>
-                <h3 className="font-bold text-xl mb-1">MATLAB Simulation</h3>
-                <p className="text-indigo-100 text-sm mb-5 opacity-90">Session logs from yesterday are ready for timelapse review.</p>
-                <button className="flex items-center gap-2 bg-white text-indigo-900 hover:bg-indigo-50 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg">
-                  <PlayCircle size={18} />
-                  Watch Timelapse (5x)
+              <div className="flex items-center gap-2">
+                <button className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                  <ListFilter size={20} />
+                </button>
+                <div className="h-4 w-px bg-slate-200 dark:bg-slate-800"></div>
+                <button className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                  <LayoutGrid size={20} />
                 </button>
               </div>
             </div>
+
+            {isCreating ? (
+              <form onSubmit={handleQuickCreate} className="bg-white dark:bg-slate-900/80 backdrop-blur-3xl p-10 rounded-[2.5rem] border border-blue-500/30 shadow-3xl animate-in fade-in slide-in-from-bottom-8 duration-500">
+                <div className="flex items-center gap-4 mb-10">
+                   <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-500/20">
+                      <Zap size={28} />
+                   </div>
+                   <div>
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">Initialize New Protocol</h3>
+                      <p className="text-sm text-slate-500 font-medium">Define the core objectives for this initiative</p>
+                   </div>
+                </div>
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Initiative Name</label>
+                    <input 
+                      id="projectName"
+                      name="projectName"
+                      autoFocus
+                      type="text" 
+                      placeholder="e.g. Project Phoenix" 
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4.5 text-base font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Technical Scope</label>
+                    <textarea 
+                      id="projectDesc"
+                      name="projectDesc"
+                      placeholder="Details, objectives, and parameters..." 
+                      value={newProjectDesc}
+                      onChange={(e) => setNewProjectDesc(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4.5 text-base font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none h-40 resize-none"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-4 pt-6">
+                    <button type="button" onClick={() => setIsCreating(false)} className="px-8 py-4 text-sm font-bold text-slate-500 hover:text-slate-950 dark:hover:text-white">Abort</button>
+                    <button type="submit" className="bg-blue-600 text-white px-12 py-4 rounded-2xl text-sm font-bold shadow-2xl shadow-blue-600/30 hover:bg-blue-500 transition-all active:scale-95">Establish initiative</button>
+                  </div>
+                </div>
+              </form>
+            ) : projects.length === 0 ? (
+              <div className="glass-card rounded-[3rem] p-24 flex flex-col items-center justify-center text-center">
+                <div className="w-28 h-28 bg-slate-50 dark:bg-slate-900 rounded-[2rem] flex items-center justify-center mb-10 relative">
+                   <div className="absolute inset-0 border-2 border-blue-500/20 rounded-[2rem] animate-pulse-slow"></div>
+                   <Monitor className="text-slate-300 dark:text-slate-700" size={48} />
+                </div>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter">Standby for Data</h3>
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-12 text-lg leading-relaxed font-medium">
+                  Schmer is waiting for project initialization. Once active, all engineering telemetry will be indexed here.
+                </p>
+                <button 
+                  onClick={() => setIsCreating(true)}
+                  className="group px-12 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-bold text-sm flex items-center gap-3 hover:scale-105 transition-all shadow-3xl"
+                >
+                  Start First Project <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {projects.map(project => (
+                  <div 
+                    key={project.id}
+                    onClick={() => onSelectProject(project.id)}
+                    className="group glass-card p-8 rounded-[2rem] hover:tech-border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-8"
+                  >
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></div>
+                        <h3 className="font-extrabold text-2xl text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors tracking-tight">{project.name}</h3>
+                      </div>
+                      <p className="text-slate-500 dark:text-slate-400 line-clamp-1 font-medium pl-7 text-sm">{project.description}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-10 pl-7 sm:pl-0">
+                      <div className="text-right hidden md:block">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Telemetry Sync</p>
+                        <p className="text-sm font-mono text-slate-700 dark:text-slate-300">ACTIVE_NODE_{project.id.slice(1, 5)}</p>
+                      </div>
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:translate-x-2">
+                        <ArrowRight size={24} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Lateral Telemetry Section */}
+          <div className="lg:col-span-4 space-y-10">
+            
+            <div className="glass-card rounded-[2.5rem] p-8">
+              <div className="flex items-center justify-between mb-10">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Terminal size={14} /> Output Log
+                </h3>
+                <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">REALTIME</span>
+              </div>
+              
+              <div ref={chartRef} className="w-full h-64 relative blueprint-bg rounded-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col items-center justify-center overflow-hidden" style={{ minWidth: 1, minHeight: 1 }}>
+                <LazyBarChart ready={chartWidth > 10} data={emptyData} height={256} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                   <p className="text-[10px] font-mono text-slate-400 uppercase tracking-[0.2em] animate-pulse">Waiting for Signal...</p>
+                </div>
+              </div>
+              <div className="mt-8 space-y-3">
+                 <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                    <span>Base Sample</span>
+                    <span>4096hz</span>
+                 </div>
+                 <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-1/3 h-full bg-blue-500/20"></div>
+                 </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 dark:bg-white rounded-[2.5rem] p-10 shadow-3xl relative overflow-hidden group">
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-600/20 rounded-full blur-[80px] group-hover:bg-blue-600/30 transition-all duration-1000"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></div>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Deployment Node</span>
+                </div>
+                <h3 className="text-2xl font-black text-white dark:text-slate-900 mb-4 tracking-tighter leading-none">Bridge Active.</h3>
+                <p className="text-slate-400 dark:text-slate-500 text-sm mb-10 font-medium leading-relaxed">
+                  The Schmer Extension enables seamless session synchronization with external CAD and IDE environments.
+                </p>
+                <button className="w-full bg-white/5 dark:bg-slate-100 hover:bg-white/10 dark:hover:bg-slate-200 text-white dark:text-slate-900 py-4 rounded-2xl text-xs font-black border border-white/10 dark:border-slate-200 transition-all group-hover:border-blue-500/50">
+                  Update Core v1.0.4
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

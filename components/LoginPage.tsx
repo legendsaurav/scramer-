@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { ArrowRight, Lock, Mail, Loader2, Zap, User as UserIcon, HelpCircle, ArrowLeft } from 'lucide-react';
+import { ArrowRight, Lock, Mail, Loader2, Zap, User as UserIcon, HelpCircle, ArrowLeft, KeyRound } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { isSupabaseConfigured, CONFIG_ERROR_MESSAGE } from '../lib/supabase';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
@@ -15,7 +16,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hintResult, setHintResult] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Form States
   const [name, setName] = useState('');
@@ -26,44 +26,35 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setStatusMessage(null);
-    setHintResult(null);
     setIsLoading(true);
+    setHintResult(null);
 
     try {
+      let result: { success: boolean; message?: string } | undefined;
+
       if (mode === 'LOGIN') {
-        const result = await authHook.login(email, password);
-        if (!result.success) {
-          setError(result.message || 'Unable to sign in.');
-          return;
-        }
-        onLoginSuccess();
-        return;
-      }
-
-      if (mode === 'REGISTER') {
-        const result = await authHook.register(name, email, password, hint);
-        if (!result.success) {
-          setError(result.message || 'Unable to create account.');
-          return;
-        }
-
-        setStatusMessage(result.message || 'Account created! You can sign in now.');
-        setMode('LOGIN');
-        setPassword('');
-        return;
-      }
-
-      if (mode === 'FORGOT_PASSWORD') {
+        result = await authHook.login(email, password);
+      } else if (mode === 'REGISTER') {
+        result = await authHook.register(name, email, password, hint);
+      } else if (mode === 'FORGOT_PASSWORD') {
         const foundHint = await authHook.getPasswordHint(email);
         if (foundHint) {
           setHintResult(foundHint);
+          return;
         } else {
-          setError('Email not found.');
+          result = { success: false, message: 'Email not found.' };
         }
       }
+
+      if (result?.success) {
+        if (mode !== 'FORGOT_PASSWORD') {
+          onLoginSuccess();
+        }
+      } else {
+        setError(result?.message || 'An error occurred');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      setError('An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +64,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
     setMode(newMode);
     setError(null);
     setHintResult(null);
-    setStatusMessage(null);
     // Keep email if switching between login/forgot
   };
 
@@ -108,17 +98,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
             </p>
           </div>
 
+          {/* Config Warning */}
+          {!isSupabaseConfigured && (
+            <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-sm text-center">
+              {CONFIG_ERROR_MESSAGE}
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center font-medium animate-pulse">
               {error}
-            </div>
-          )}
-
-          {/* Status Message */}
-          {statusMessage && (
-            <div className="mb-6 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300 text-sm text-center font-medium animate-fade-in">
-              {statusMessage}
             </div>
           )}
 
@@ -148,6 +138,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
                       <UserIcon className="h-5 w-5 text-slate-500 group-focus-within/input:text-blue-500 transition-colors" />
                     </div>
                     <input
+                      id="registerFullName"
+                      name="fullName"
                       type="text"
                       required
                       value={name}
@@ -166,6 +158,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
                     <Mail className="h-5 w-5 text-slate-500 group-focus-within/input:text-blue-500 transition-colors" />
                   </div>
                   <input
+                    id="authEmail"
+                    name="email"
                     type="email"
                     required
                     value={email}
@@ -184,6 +178,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
                       <Lock className="h-5 w-5 text-slate-500 group-focus-within/input:text-blue-500 transition-colors" />
                     </div>
                     <input
+                      id="authPassword"
+                      name="password"
                       type="password"
                       required
                       value={password}
@@ -214,6 +210,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
                       <HelpCircle className="h-5 w-5 text-slate-500 group-focus-within/input:text-blue-500 transition-colors" />
                     </div>
                     <input
+                      id="registerHint"
+                      name="passwordHint"
                       type="text"
                       required
                       value={hint}
@@ -228,7 +226,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, authHook }) => {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !isSupabaseConfigured}
                 className={`
                   w-full relative group/btn flex items-center justify-center gap-2 py-3.5 px-4 
                   bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 

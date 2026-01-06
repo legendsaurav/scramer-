@@ -1,194 +1,150 @@
 
 import { useState, useEffect } from 'react';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 import { User, UserRole } from '../types';
-import { supabase, CONFIG_ERROR_MESSAGE, siteUrl } from '../lib/supabaseClient';
-
-const SESSION_KEY = 'schmer_session_v1';
-
-type AuthResult = {
-  success: boolean;
-  message?: string;
-  autoLogin?: boolean;
-};
-
-const interpretAuthError = (error: unknown): string => {
-  if (!error) return 'Unexpected authentication error.';
-
-  if (typeof error === 'object') {
-    const anyError = error as { status?: number; message?: string };
-    if (anyError.status === 400) {
-      return (anyError.message && anyError.message.toLowerCase().includes('invalid'))
-        ? 'Incorrect email or password, or the email has not been confirmed yet.'
-        : 'Request rejected. Double-check your credentials.';
-    }
-    if (anyError.status === 404) {
-      return 'Supabase endpoint not found. Verify VITE_SUPABASE_URL is correct and accessible.';
-    }
-    if (anyError.status === 429) {
-      return 'Too many attempts. Please wait a moment before trying again.';
-    }
-    if (typeof anyError.message === 'string') {
-      if (anyError.message.includes('Failed to fetch')) {
-        return 'Could not reach Supabase. Check your internet connection or firewall settings.';
-      }
-      return anyError.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    if (error.message.includes('Failed to fetch')) {
-      return 'Could not reach Supabase. Check your internet connection or firewall settings.';
-    }
-    return error.message;
-  }
-
-  return String(error);
-};
-
-const mapSupabaseUser = (user: SupabaseUser): User => ({
-  id: user.id,
-  name: user.user_metadata?.full_name || user.email || 'User',
-  email: user.email || '',
-  avatar: user.user_metadata?.avatar_url || `https://picsum.photos/seed/${user.id}/200/200`,
-  role: (user.user_metadata?.role as UserRole) || UserRole.MEMBER
-});
+import { supabase, isSupabaseConfigured, CONFIG_ERROR_MESSAGE } from '../lib/supabase';
 
 export const useAuth = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [configError] = useState<string | null>(() => (!supabase ? CONFIG_ERROR_MESSAGE : null));
 
   useEffect(() => {
-    if (!supabase) {
+    if (!isSupabaseConfigured) {
+      // If not configured, stop loading and leave auth state empty
       setLoading(false);
       return;
     }
 
-    const init = async () => {
-      const storedUser = localStorage.getItem(SESSION_KEY);
-      if (storedUser) {
-        setCurrentUser(JSON.parse(storedUser));
-      }
-
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) {
-        const mapped = mapSupabaseUser(data.session.user);
-        setCurrentUser(mapped);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(mapped));
-      }
-
-      setLoading(false);
-    };
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const mapped = mapSupabaseUser(session.user);
-        setCurrentUser(mapped);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(mapped));
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchProfile(session.user.id);
       } else {
-        setCurrentUser(null);
-        localStorage.removeItem(SESSION_KEY);
+        setLoading(false);
       }
     });
 
-    init();
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<AuthResult> => {
-    if (!supabase) {
+  const fetchProfile = async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    // Alias password_hint to passwordHint
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, avatar, role, passwordHint:password_hint')
+      .eq('id', userId)
+      .single();
+
+    if (data) {
+      setCurrentUser(data as unknown as User);
+    }
+    setLoading(false);
+  };
+
+  const login = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
       return { success: false, message: CONFIG_ERROR_MESSAGE };
     }
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        return { success: false, message: interpretAuthError(error) };
-      }
-
-      const supabaseUser = data.user ?? data.session?.user;
-      if (!supabaseUser) {
-        return { success: false, message: 'Unable to login.' };
-      }
-
-      const mapped = mapSupabaseUser(supabaseUser);
-      setCurrentUser(mapped);
-      localStorage.setItem(SESSION_KEY, JSON.stringify(mapped));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) return { success: false, message: error.message };
       return { success: true };
-    } catch (err) {
-      return { success: false, message: interpretAuthError(err) };
+    } catch (e) {
+      return { success: false, message: 'Network error. Check your Supabase configuration.' };
     }
   };
 
-  const register = async (
-    name: string,
-    email: string,
-    password: string,
-    hint: string
-  ): Promise<AuthResult> => {
-    if (!supabase) {
+  const register = async (name: string, email: string, password: string, hint: string) => {
+    if (!isSupabaseConfigured) {
       return { success: false, message: CONFIG_ERROR_MESSAGE };
     }
-
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: siteUrl,
           data: {
             full_name: name,
-            password_hint: hint,
-            role: UserRole.MEMBER
           }
         }
       });
 
-      if (error) {
-        return { success: false, message: interpretAuthError(error) };
+      if (error) return { success: false, message: error.message };
+
+      if (data.user) {
+        // Create initial profile
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          name,
+          email,
+          role: UserRole.MEMBER,
+          password_hint: hint,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}&backgroundType=gradient&radius=50`
+        });
+
+        if (profileError) return { success: false, message: profileError.message };
       }
 
-      if (data.session?.user) {
-        const mapped = mapSupabaseUser(data.session.user);
-        setCurrentUser(mapped);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(mapped));
-        return { success: true, autoLogin: true };
-      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: 'Network error. Check your Supabase configuration.' };
+    }
+  };
 
-      return {
-        success: true,
-        autoLogin: false,
-        message: 'Account created! Check your email to verify before signing in.'
-      };
-    } catch (err) {
-      return { success: false, message: interpretAuthError(err) };
+  const updateAvatar = async (newAvatar: string) => {
+    if (!currentUser) return;
+    if (!isSupabaseConfigured) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar: newAvatar })
+      .eq('id', currentUser.id);
+
+    if (!error) {
+      setCurrentUser(prev => prev ? { ...prev, avatar: newAvatar } : null);
     }
   };
 
   const logout = async () => {
-    if (!supabase) {
-      return;
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
     }
-    await supabase.auth.signOut();
     setCurrentUser(null);
-    localStorage.removeItem(SESSION_KEY);
   };
 
-  const getPasswordHint = async (_email: string) => {
-    return 'Please contact support for recovery.';
+  const getPasswordHint = async (email: string): Promise<string | null> => {
+    if (!isSupabaseConfigured) return null;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('password_hint')
+        .eq('email', email)
+        .single();
+      return data?.password_hint || null;
+    } catch {
+      return null;
+    }
   };
 
   return {
     currentUser,
     loading,
-    configured: !!supabase,
-    configError,
     login,
     register,
     logout,
+    updateAvatar,
     getPasswordHint
   };
 };

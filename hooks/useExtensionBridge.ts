@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 
 // Define the message types for type safety
 type ExtensionMessage = 
-  | { type: 'SCHMER_PONG'; payload?: any }
-  | { type: 'SCHMER_RECORDING_STARTED'; payload: { software: string; startTime: number } }
+  | { type: 'SCHMER_PONG'; payload?: { version?: string } }
+  | { type: 'SCHMER_RECORDING_STARTED'; payload: { tool?: string; software?: string; startTime: number } }
   | { type: 'SCHMER_RECORDING_STOPPED'; payload: any }
+  | { type: 'SCHMER_RECORDING_READY'; payload: { blob?: Blob; filename: string; projectId: string; tool: string } }
   | { type: 'SCHMER_ERROR'; payload: { message: string } };
 
 export interface ExtensionStatus {
@@ -15,6 +16,7 @@ export interface ExtensionStatus {
     startTime: number;
   } | null;
   error: string | null;
+  version?: string;
 }
 
 export const useExtensionBridge = () => {
@@ -22,8 +24,35 @@ export const useExtensionBridge = () => {
     isInstalled: false,
     isRecording: false,
     currentSession: null,
-    error: null
+    error: null,
+    version: undefined
   });
+
+  const backendUrl = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+
+  const uploadBlobToBackend = async (blob: Blob, filename: string, projectId: string, tool: string, autoMerge?: boolean) => {
+    if (!backendUrl) return false;
+    try {
+      const form = new FormData();
+      form.append('file', blob, filename);
+      form.append('projectId', projectId);
+      form.append('tool', tool);
+      form.append('date', new Date().toISOString().slice(0,10));
+      form.append('segment', String(Date.now()));
+      const res = await fetch(`${backendUrl}/upload`, { method: 'POST', body: form, mode: 'cors' });
+      const ok = res.ok;
+      if (ok && autoMerge) {
+        await fetch(`${backendUrl}/merge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ projectId, tool, date: new Date().toISOString().slice(0,10) })
+        });
+      }
+      return ok;
+    } catch {
+      return false;
+    }
+  };
 
   // Listener for messages FROM the extension (Content Script)
   const handleExtensionMessage = useCallback((event: MessageEvent) => {
@@ -34,7 +63,7 @@ export const useExtensionBridge = () => {
 
     switch (message.type) {
       case 'SCHMER_PONG':
-        setStatus(prev => ({ ...prev, isInstalled: true }));
+        setStatus(prev => ({ ...prev, isInstalled: true, version: message.payload?.version }));
         break;
       
       case 'SCHMER_RECORDING_STARTED':
@@ -43,7 +72,7 @@ export const useExtensionBridge = () => {
           isRecording: true,
           error: null,
           currentSession: {
-            software: message.payload.software,
+            software: message.payload.tool || message.payload.software || 'unknown',
             startTime: message.payload.startTime || Date.now()
           }
         }));
@@ -56,6 +85,40 @@ export const useExtensionBridge = () => {
           currentSession: null
         }));
         break;
+
+      case 'SCHMER_RECORDING_READY': {
+        const { blob, blobUrl, filename, projectId, tool } = message.payload as any;
+        const handleUpload = async () => {
+          try {
+            let b: Blob | null = blob || null;
+            if (!b && blobUrl) {
+              try {
+                const resp = await fetch(blobUrl, { mode: 'cors' });
+                b = await resp.blob();
+              } catch {}
+            }
+            if (b) {
+              const ok = await uploadBlobToBackend(b, filename, projectId, tool, true);
+              if (ok) {
+                // Notify UI to refresh sessions
+                window.postMessage({ type: 'SCHMER_REFRESH_SESSIONS', payload: { projectId } }, '*');
+              } else {
+                // Fallback to local download
+                const url = URL.createObjectURL(b);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              }
+            }
+          } catch {}
+        };
+        handleUpload();
+        break;
+      }
 
       case 'SCHMER_ERROR':
         setStatus(prev => ({ ...prev, error: message.payload.message }));
@@ -80,22 +143,20 @@ export const useExtensionBridge = () => {
     };
   }, [handleExtensionMessage, status.isInstalled]);
 
-  const startSession = (software: string, url: string, projectId: string) => {
+  const startSession = (software: string, url: string, projectId: string, options?: Record<string, any>) => {
+    // Open the tool tab immediately for a snappy UX
+    try { window.open(url, '_blank'); } catch {}
+
     if (!status.isInstalled) {
-        // Fallback: If extension isn't detected, we can alert or redirect to store
-        console.warn("Schmer Extension not detected.");
+        console.warn("Schmer Extension not detected. Opened the tool without recording.");
         return;
     }
 
-    // 1. Send command to extension
+    // Ask the extension to start recording without opening the tool again.
     window.postMessage({ 
         type: 'SCHMER_START_RECORDING', 
-        payload: { software, url, projectId } 
+        payload: { projectId, tool: software, options: { ...(options || {}), toolUrl: url, openInExtension: false } } 
     }, '*');
-
-    // 2. Open the target software URL
-    // The extension should detect this new tab/window and attach the recorder
-    window.open(url, '_blank');
   };
 
   const stopSession = () => {

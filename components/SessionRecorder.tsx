@@ -21,8 +21,13 @@ const SoftwareIcon = ({ type, className = "w-8 h-8" }: { type: SoftwareType, cla
   return <Monitor className={`${className} text-slate-500`} />;
 };
 
-const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }) => {
+type MergedSession = { tool: string; date: string; paths: Record<string,string> };
+
+const SessionRecorder: React.FC<{ sessions: SoftwareSession[]; projectId: string }> = ({ sessions, projectId }) => {
   const [selectedSession, setSelectedSession] = useState<SoftwareSession | null>(null);
+  const [mergedSessions, setMergedSessions] = useState<MergedSession[]>([]);
+  const [selectedMerged, setSelectedMerged] = useState<MergedSession | null>(null);
+  const [playVariant, setPlayVariant] = useState<'1x'|'2x'|'5x'|'10x'>('1x');
   const { extensionStatus, startSession, stopSession } = useExtensionBridge();
   
   // Player State
@@ -30,7 +35,7 @@ const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [progress, setProgress] = useState(0);
 
-  // Simulation of video progress
+  // Simulation of video progress (for legacy demo sessions)
   useEffect(() => {
     let interval: any;
     if (isPlaying && progress < 100) {
@@ -43,13 +48,27 @@ const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }
     return () => clearInterval(interval);
   }, [isPlaying, progress, playbackSpeed]);
 
+  // Fetch merged sessions from backend
+  useEffect(() => {
+    const backendUrl = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+    if (!backendUrl || !projectId) return;
+    fetch(`${backendUrl}/sessions?projectId=${encodeURIComponent(projectId)}`)
+      .then(r => r.json())
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.sessions)) {
+          setMergedSessions(json.sessions as MergedSession[]);
+        }
+      })
+      .catch(() => {});
+  }, [projectId, extensionStatus.isRecording]);
+
   const handleLaunch = (toolId: SoftwareType, url: string) => {
     if (!extensionStatus.isInstalled) {
       // In a real app, this would redirect to Chrome Web Store
       alert("Please install the Schmer Screen Recorder extension to continue.");
       return;
     }
-    startSession(toolId, url, 'current-project-id');
+    startSession(toolId, url, projectId);
   };
 
   return (
@@ -71,6 +90,29 @@ const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }
                  Get Extension
                </button>
              </div>
+          </div>
+        )}
+
+        {/* Extension Debug Panel */}
+        {extensionStatus.isInstalled && (
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-center justify-between">
+            <div className="text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+              Extension Ready {extensionStatus.version ? `• v${extensionStatus.version}` : ''}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => startSession(SoftwareType.VSCODE, 'https://vscode.dev', 'current-project-id', { debug: true })}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                Test Start
+              </button>
+              <button
+                onClick={stopSession}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white"
+              >
+                Test Stop
+              </button>
+            </div>
           </div>
         )}
 
@@ -100,39 +142,56 @@ const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }
           </div>
         )}
 
-        {/* Daily Sessions List */}
+        {/* Daily Sessions List (Merged from backend) */}
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col flex-1">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-            <h3 className="font-semibold">Merged Daily Recaps</h3>
-            <p className="text-xs text-slate-500 mt-1">Sessions are auto-merged at midnight</p>
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">Daily Sessions</h3>
+              <p className="text-xs text-slate-500 mt-1">Auto-merged per tool and date</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const backendUrl = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+                  if (!backendUrl || !projectId) return;
+                  // Merge today's clips for all tools (simple trigger)
+                  const today = new Date().toISOString().slice(0,10);
+                  const tools = Array.from(new Set(mergedSessions.map(s => s.tool)));
+                  Promise.all(tools.map(t => fetch(`${backendUrl}/merge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectId, tool: t, date: today })
+                  }))).then(() => {
+                    // refetch
+                    fetch(`${backendUrl}/sessions?projectId=${encodeURIComponent(projectId)}`)
+                      .then(r => r.json())
+                      .then(json => { if (json?.ok) setMergedSessions(json.sessions); });
+                  });
+                }}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Merge Today
+              </button>
+            </div>
           </div>
-          
           <div className="overflow-y-auto flex-1 p-2 space-y-2">
-            {sessions.map(session => (
-              <div 
-                key={session.id}
-                onClick={() => { setSelectedSession(session); setProgress(0); setIsPlaying(false); }}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  selectedSession?.id === session.id 
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 ring-1 ring-blue-500' 
-                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-400'
-                }`}
+            {mergedSessions.map(s => (
+              <div
+                key={`${s.tool}-${s.date}`}
+                onClick={() => setSelectedMerged(s)}
+                className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedMerged?.tool === s.tool && selectedMerged?.date === s.date ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 ring-1 ring-blue-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-400'}`}
               >
                 <div className="flex items-center gap-3">
-                  <SoftwareIcon type={session.software} />
+                  {/* Tool logo */}
+                  <SoftwareIcon type={s.tool as unknown as SoftwareType} />
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between">
-                      <p className="font-medium text-sm truncate">{session.software}</p>
-                      <span className="text-xs text-slate-500">{session.date}</span>
+                      <p className="font-medium text-sm truncate">{s.tool}</p>
+                      <span className="text-xs text-slate-500">{s.date}</span>
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                       <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                         <Layers size={10} />
-                         {session.sessionCount} clips
-                       </span>
-                       <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                         {session.totalDuration}
-                       </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1"><Layers size={10} /> Final</span>
+                      <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">1x / 2x / 5x / 10x</span>
                     </div>
                   </div>
                 </div>
@@ -179,8 +238,30 @@ const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }
         )}
 
         {/* Video Player */}
-        <div className={`flex-1 bg-slate-900 rounded-xl overflow-hidden flex flex-col relative shadow-2xl min-h-[400px] border border-slate-800 ${!selectedSession ? 'hidden' : 'flex'}`}>
-          {selectedSession ? (
+        <div className={`flex-1 bg-slate-900 rounded-xl overflow-hidden flex flex-col relative shadow-2xl min-h-[400px] border border-slate-800`}>
+          {selectedMerged ? (
+            <>
+              <div className="flex-1 bg-black relative">
+                <video
+                  src={selectedMerged.paths[playVariant] || selectedMerged.paths['1x']}
+                  controls
+                  style={{ width: '100%', height: '100%' }}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onRateChange={(e) => setPlaybackSpeed((e.currentTarget as HTMLVideoElement).playbackRate)}
+                  onLoadedData={(e) => { (e.currentTarget as HTMLVideoElement).playbackRate = playVariant === '1x' ? 1 : parseInt(playVariant); }}
+                />
+              </div>
+              <div className="h-24 bg-slate-950 border-t border-slate-800 p-4 flex items-center justify-between">
+                <div className="text-white text-sm font-medium">{selectedMerged.tool} • {selectedMerged.date}</div>
+                <div className="flex items-center gap-2">
+                  {(['1x','2x','5x','10x'] as const).map(v => (
+                    <button key={v} onClick={() => setPlayVariant(v)} className={`text-xs font-bold px-3 py-1.5 rounded transition-all border ${playVariant === v ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/50' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800 hover:border-slate-600'}`}>{v}</button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : selectedSession ? (
             <>
               <div className="flex-1 bg-black relative flex items-center justify-center group">
                  {/* This represents the merged video file */}
@@ -260,8 +341,8 @@ const SessionRecorder: React.FC<{ sessions: SoftwareSession[] }> = ({ sessions }
           ) : (
              <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
                <MonitorPlay size={64} className="mb-4 opacity-20" />
-               <p className="text-lg font-medium">Select a merged recap from the list</p>
-               <p className="text-sm opacity-50">or launch a new session above</p>
+               <p className="text-lg font-medium">Select a daily session from the list</p>
+               <p className="text-sm opacity-50">or launch a new recording above</p>
              </div>
           )}
         </div>

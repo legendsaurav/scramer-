@@ -1,14 +1,15 @@
+
 import React from 'react';
 import { 
   LayoutDashboard, 
   FolderKanban, 
   Settings, 
-  LogOut, 
   Moon, 
   Sun,
   Menu,
   X,
-  MessageSquare
+  MessageSquare,
+  Activity
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -28,137 +29,131 @@ const Layout: React.FC<LayoutProps> = ({
   user, 
   darkMode, 
   toggleDarkMode,
+  currentView,
   onChangeView,
   onToggleProfile,
   onToggleChat
 }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  // Get initials from user name
-  const initials = user.name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase();
-
   return (
-    <div className={`min-h-screen flex ${darkMode ? 'dark' : ''} font-sans selection:bg-blue-500 selection:text-white`}>
-      <div className="flex w-full text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div className={`min-h-screen flex ${darkMode ? 'dark' : ''} font-sans selection:bg-blue-500/30`}>
+      <div className="flex w-full text-slate-900 dark:text-slate-100 transition-colors duration-500">
         
-        {/* Mobile Overlay */}
+        {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div 
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-md z-[60] lg:hidden animate-in fade-in duration-300"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar - Mobile Only */}
+        {/* Sidebar */}
         <aside className={`
-          fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-out
-          bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl
+          fixed inset-y-0 left-0 z-[70] w-72 transform transition-all duration-500 ease-in-out
+          bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border-r border-slate-200 dark:border-slate-800/50
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:static lg:block'} 
+          shadow-2xl lg:shadow-none
         `}>
           <div className="h-full flex flex-col">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Schmer</span>
-              <button 
-                onClick={() => setSidebarOpen(false)} 
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-              >
+            <div className="h-20 px-8 flex items-center justify-between border-b border-slate-200 dark:border-slate-800/50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <Activity size={18} className="text-white" />
+                </div>
+                <span className="font-extrabold text-xl tracking-tighter text-slate-900 dark:text-white">SCHMER</span>
+              </div>
+              <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-2 text-slate-400">
                 <X size={20} />
               </button>
             </div>
 
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 py-8 space-y-2">
               <button 
                 onClick={() => { onChangeView('DASHBOARD'); setSidebarOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  currentView === 'DASHBOARD' 
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' 
+                    : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                }`}
               >
                 <LayoutDashboard size={20} />
-                Dashboard
+                Mission Control
               </button>
               <button 
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50 transition-colors"
                 onClick={() => { onChangeView('DASHBOARD'); setSidebarOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all"
               >
                 <FolderKanban size={20} />
-                Projects
+                Global Workspace
+              </button>
+              <div className="pt-4 px-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Maintenance</span>
+              </div>
+              <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all">
+                <Settings size={20} />
+                System Settings
               </button>
             </nav>
 
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-               <div className="flex items-center justify-between mb-4 px-2">
-                  <span className="text-sm font-medium text-slate-500">Theme</span>
+            <div className="p-6 border-t border-slate-200 dark:border-slate-800/50">
+               <div className="flex items-center justify-between mb-6 px-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Interface</span>
                   <button 
                     onClick={toggleDarkMode}
-                    className="p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-full transition-colors"
+                    className="p-2 text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400 rounded-xl hover:scale-110 transition-transform"
                   >
-                    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                    {darkMode ? <Sun size={18} /> : <Moon size={18} />}
                   </button>
                </div>
-              <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-xl transition-colors">
-                <LogOut size={20} />
-                Sign Out
-              </button>
+               <div 
+                  className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
+                  onClick={onToggleProfile}
+               >
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-200 dark:bg-slate-800">
+                      <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold truncate">{user.name}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">ID: {user.id.slice(0, 6)}</p>
+                    </div>
+                  </div>
+               </div>
             </div>
           </div>
         </aside>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          {/* Header - Glassmorphism Sticky */}
-          <header className="h-20 glass-panel border-b border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between px-6 lg:px-8 shadow-sm z-30 absolute top-0 left-0 right-0">
-            
-            {/* Left: Hamburger (Mobile) + SS Logo */}
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              >
+        {/* Main */}
+        <div className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+          <header className="h-20 bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between px-6 lg:px-10 z-50">
+            <div className="flex items-center gap-6">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
                 <Menu size={24} />
               </button>
-              
-              {/* Profile Toggle Button */}
-              <button 
-                onClick={onToggleProfile}
-                className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 p-0.5 flex items-center justify-center shadow-lg shadow-orange-500/20 hover:scale-105 transition-transform z-20"
-                title="Toggle Personal Details"
-              >
-                <div className="w-full h-full rounded-full bg-slate-900/10 flex items-center justify-center border-2 border-white/20">
-                  <span className="text-white font-bold text-lg tracking-wide">{initials}</span>
-                </div>
-              </button>
+              <div className="flex items-center gap-3">
+                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                 <h2 className="text-sm font-medium text-slate-600 dark:text-slate-300">Network Active</h2>
+              </div>
             </div>
 
-            {/* Center: PROJECTS Title */}
-            <div className="absolute left-0 right-0 top-0 bottom-0 flex items-center justify-center pointer-events-none">
-              <h1 className="text-2xl md:text-3xl font-light tracking-[0.2em] text-slate-900 dark:text-white uppercase pointer-events-auto select-none">
-                Projects
-              </h1>
-            </div>
-
-            {/* Right: Chat Toggle Button */}
-            <div className="flex items-center gap-4 z-20">
+            <div className="flex items-center gap-4">
               <button 
                 onClick={onToggleChat}
-                className="relative cursor-pointer group hover:scale-110 transition-transform duration-300"
-                title="Toggle Chat"
+                className="p-2.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 rounded-xl hover:text-blue-500 dark:hover:text-blue-400 transition-all hover:scale-105"
               >
-                 <div className="absolute -inset-2 bg-green-500/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                 {/* Back Bubble */}
-                 <div className="absolute top-0 right-0 w-8 h-8 bg-green-600 rounded-2xl transform rotate-6 group-hover:rotate-12 transition-transform border border-white/10 shadow-sm"></div>
-                 {/* Front Bubble */}
-                 <div className="relative w-10 h-8 bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-900/20 border border-white/20">
-                    <MessageSquare className="text-white w-4 h-4" fill="currentColor" />
-                 </div>
+                <MessageSquare size={20} />
+              </button>
+              <button 
+                onClick={onToggleProfile}
+                className="w-10 h-10 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:scale-105 transition-transform bg-slate-200 dark:bg-slate-800"
+              >
+                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
               </button>
             </div>
           </header>
 
-          {/* Page Content */}
-          <main className="flex-1 overflow-hidden relative pt-20">
+          <main className="flex-1 overflow-hidden relative">
             {children}
           </main>
         </div>
