@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, ViewState, Project } from './types';
-import { MOCK_PROJECTS, MOCK_MEETINGS, MOCK_SESSIONS, MOCK_CHAT, MOCK_ANNOUNCEMENTS } from './constants';
+import { MOCK_MEETINGS, MOCK_SESSIONS, MOCK_CHAT, MOCK_ANNOUNCEMENTS } from './constants';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ProjectDetail from './components/ProjectDetail';
@@ -9,6 +9,7 @@ import LoginPage from './components/LoginPage';
 import ChatInterface from './components/ChatInterface';
 import { useAuth } from './hooks/useAuth';
 import { X, Mail, Camera, Edit2 } from 'lucide-react';
+import { fetchProjects, createProject as createProjectCloud } from './lib/dataRepository';
 
 const PROJECTS_STORAGE_KEY = 'schmer_projects_v1';
 
@@ -29,22 +30,16 @@ function App() {
   const [showProfileSidebar, setShowProfileSidebar] = useState(false);
   const [showChatSidebar, setShowChatSidebar] = useState(false);
 
-  // Load projects from storage
+  // Load projects from Supabase (no local storage)
   useEffect(() => {
-    const saved = localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (saved) {
-      setProjects(JSON.parse(saved));
-    } else {
-      setProjects(MOCK_PROJECTS);
-    }
+    let cancelled = false;
+    const run = async () => {
+      const cloud = await fetchProjects();
+      if (!cancelled) setProjects(cloud);
+    };
+    run();
+    return () => { cancelled = true; };
   }, []);
-
-  // Persist projects
-  useEffect(() => {
-    if (projects.length > 0) {
-      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
-    }
-  }, [projects]);
 
   // Dark mode
   useEffect(() => {
@@ -55,16 +50,10 @@ function App() {
     }
   }, [state.darkMode]);
 
-  const handleCreateProject = (name: string, description: string) => {
-    const newProject: Project = {
-      id: `p${Date.now()}`,
-      name,
-      description,
-      members: [auth.currentUser?.id || 'u1'],
-      status: 'active',
-      lastActivity: new Date().toISOString()
-    };
-    setProjects(prev => [newProject, ...prev]);
+  const handleCreateProject = async (name: string, description: string) => {
+    if (!auth.currentUser) return;
+    const created = await createProjectCloud(name, description, auth.currentUser.id);
+    if (created) setProjects(prev => [created, ...prev]);
   };
 
   const handleSelectProject = (projectId: string) => {
@@ -152,8 +141,8 @@ function App() {
         {state.currentView === 'PROJECT_DETAIL' && currentProject && (
           <ProjectDetail 
             project={currentProject}
-            meetings={MOCK_MEETINGS.filter(m => m.projectId === currentProject.id)}
-            sessions={MOCK_SESSIONS.filter(s => s.projectId === currentProject.id)}
+            meetings={[]}
+            sessions={[]}
             chatMessages={MOCK_CHAT.filter(c => c.projectId === currentProject.id)}
             announcements={MOCK_ANNOUNCEMENTS.filter(a => a.projectId === currentProject.id)}
             currentUser={auth.currentUser}

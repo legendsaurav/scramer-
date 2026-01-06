@@ -77,8 +77,11 @@ const ChatInterface: React.FC<ChatProps> = ({ projectId, currentUserId }) => {
       }
     };
 
-    const cleanup = fetchAndSubscribe();
-    return () => { if (typeof cleanup === 'function') cleanup(); };
+    let unsub: (() => void) | null = null;
+    fetchAndSubscribe().then((fn) => {
+      if (typeof fn === 'function') unsub = fn;
+    });
+    return () => { if (unsub) unsub(); };
   }, [projectId]);
 
   useEffect(() => {

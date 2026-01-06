@@ -11,6 +11,7 @@ import MeetingRepository from './MeetingRepository';
 import RecordingStore from './RecordingStore';
 import ToolIcon from './ToolIcon';
 import { useExtensionBridge } from '../hooks/useExtensionBridge';
+import { fetchMeetings, fetchSessions } from '../lib/dataRepository';
 
 interface ProjectDetailProps {
   project: Project;
@@ -32,6 +33,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const [viewMode, setViewMode] = useState<CenterViewMode>('DASHBOARD');
   const [showGuide, setShowGuide] = useState(true);
   const [liveAnnouncements, setLiveAnnouncements] = useState<Announcement[]>(initialAnnouncements);
+  const [liveMeetings, setLiveMeetings] = useState<MeetingRecording[]>(meetings);
+  const [liveSessions, setLiveSessions] = useState<SoftwareSession[]>(sessions);
   const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false);
   const [announcementInput, setAnnouncementInput] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -94,6 +97,30 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         supabase.removeChannel(channel);
       }
     };
+  }, [project.id]);
+
+  // Fetch meetings and sessions from Supabase for this project
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [m, s] = await Promise.all([
+          fetchMeetings(project.id),
+          fetchSessions(project.id)
+        ]);
+        if (!cancelled) {
+          setLiveMeetings(m);
+          setLiveSessions(s);
+        }
+      } catch {
+        if (!cancelled) {
+          setLiveMeetings(meetings);
+          setLiveSessions(sessions);
+        }
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, [project.id]);
 
   const showNotification = (message: string, type: 'info' | 'success') => {
@@ -383,7 +410,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
         )}
         {viewMode === 'DASHBOARD' && <DashboardCenter />}
-        {viewMode === 'MEETINGS' && <div className="h-full p-8 pt-24"><MeetingRepository meetings={meetings} /></div>}
+        {viewMode === 'MEETINGS' && <div className="h-full p-8 pt-24"><MeetingRepository meetings={liveMeetings} /></div>}
         {viewMode === 'SESSIONS' && <div className="h-full p-8 pt-24"><RecordingStore projectId={project.id} /></div>}
       </div>
     </div>
