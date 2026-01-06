@@ -14,7 +14,9 @@ const RecordingStore: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [variant, setVariant] = useState<'1x'|'2x'|'5x'|'10x'>('1x');
 
   useEffect(() => {
-    const backendUrl = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+    const raw = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+    const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const backendUrl = raw && (isHttpsPage && raw.startsWith('http://') ? undefined : raw);
     if (!backendUrl || !projectId) return;
     const refresh = () => {
       fetch(`${backendUrl}/sessions?projectId=${encodeURIComponent(projectId)}`, { mode: 'cors' })

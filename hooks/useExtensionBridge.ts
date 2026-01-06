@@ -28,7 +28,10 @@ export const useExtensionBridge = () => {
     version: undefined
   });
 
-  const backendUrl = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+  // Use backend only if scheme is safe for current page (avoid HTTPS→HTTP mixed content)
+  const rawBackend = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
+  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const backendUrl = rawBackend && (isHttpsPage && rawBackend.startsWith('http://') ? undefined : rawBackend);
 
   const uploadBlobToBackend = async (blob: Blob, filename: string, projectId: string, tool: string, autoMerge?: boolean) => {
     if (!backendUrl) return false;
