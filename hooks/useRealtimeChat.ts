@@ -12,16 +12,10 @@ type MessageRow = {
   user_name?: string;
   avatar?: string;
   content?: string;
-  created_at?: string;
+  // App originally used created_at; your table uses timestamp
+  timestamp?: string; // messages.timestamp
+  created_at?: string; // legacy/chat_messages.created_at
   edited_at?: string | null;
-};
-
-type DraftRow = {
-  project_id: string;
-  user_id: string;
-  user_name?: string;
-  content?: string;
-  updated_at?: string;
 };
 
 const mapMessageRow = (row: MessageRow): ChatMessage => ({
@@ -36,7 +30,8 @@ const mapMessageRow = (row: MessageRow): ChatMessage => ({
   type: 'text'
 });
 
-const mapDraftRow = (row: DraftRow): DraftMessage => ({
+// Drafts are kept client-side only unless you add a `drafts` table.
+const mapDraftRow = (row: { project_id: string; user_id: string; user_name?: string; content?: string; updated_at?: string; }): DraftMessage => ({
   projectId: row.project_id,
   userId: row.user_id,
   userName: row.user_name || row.user_id,
@@ -76,22 +71,19 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
     let cancelled = false;
     const fetchInitial = async () => {
       setError(null);
-      const [{ data: messageRows, error: messageError }, { data: draftRows, error: draftError }] = await Promise.all([
-        supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('chat_drafts')
-          .select('*')
-          .eq('project_id', projectId)
-      ]);
+      // Use the "messages" table (existing in your project)
+      const { data: messageRows, error: messageError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('project_id', projectId)
+        // Prefer "timestamp" if present; otherwise created_at
+        .order('timestamp', { ascending: true })
+        .order('created_at', { ascending: true });
 
       if (cancelled) return;
 
-      if (messageError || draftError) {
-        setError(messageError?.message || draftError?.message || 'Unable to load chat');
+      if (messageError) {
+        setError(messageError.message || 'Unable to load chat');
         setMessages([]);
         setDrafts([]);
         setCurrentDraft('');
@@ -99,14 +91,9 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
       }
 
       setMessages(sortByTimestamp((messageRows || []).map(mapMessageRow)));
-      const mappedDrafts = sortDrafts((draftRows || []).map(mapDraftRow));
-      setDrafts(mappedDrafts);
-      if (currentUser) {
-        const mine = mappedDrafts.find((draft) => draft.userId === currentUser.id);
-        setCurrentDraft(mine?.content || '');
-      } else {
-        setCurrentDraft('');
-      }
+      // Keep drafts client-side unless you add a table
+      setDrafts([]);
+      setCurrentDraft('');
     };
 
     fetchInitial();
@@ -120,22 +107,19 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
     if (!projectId || !supabase || !isSupabaseConfigured) return;
 
     const channel = supabase
-      .channel(`chat-messages-${projectId}`)
+      .channel(`messages-${projectId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages', filter: `project_id=eq.${projectId}` },
+        { event: '*', schema: 'public', table: 'messages', filter: `project_id=eq.${projectId}` },
         (payload: RealtimePostgresChangesPayload<MessageRow>) => {
           setMessages((prev) => {
             if (payload.eventType === 'DELETE' && payload.old) {
-              return prev.filter((msg) => msg.id !== payload.old.id);
+              return prev.filter((msg) => msg.id !== (payload.old as any).id);
             }
-
             if (!payload.new) return prev;
             const incoming = mapMessageRow(payload.new as MessageRow);
             const existingIndex = prev.findIndex((msg) => msg.id === incoming.id);
-            if (existingIndex === -1) {
-              return sortByTimestamp([...prev, incoming]);
-            }
+            if (existingIndex === -1) return sortByTimestamp([...prev, incoming]);
             const clone = [...prev];
             clone[existingIndex] = incoming;
             return sortByTimestamp(clone);
@@ -149,38 +133,8 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
     };
   }, [projectId]);
 
-  useEffect(() => {
-    if (!projectId || !supabase || !isSupabaseConfigured) return;
-
-    const channel = supabase
-      .channel(`chat-drafts-${projectId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_drafts', filter: `project_id=eq.${projectId}` },
-        (payload: RealtimePostgresChangesPayload<DraftRow>) => {
-          setDrafts((prev) => {
-            if (payload.eventType === 'DELETE' && payload.old) {
-              const filtered = prev.filter((draft) => draft.userId !== payload.old.user_id);
-              return sortDrafts(filtered);
-            }
-
-            if (!payload.new) return prev;
-            const incoming = mapDraftRow(payload.new as DraftRow);
-            const filtered = prev.filter((draft) => draft.userId !== incoming.userId);
-            return sortDrafts([...filtered, incoming]);
-          });
-
-          if (currentUser && (payload.new as DraftRow)?.user_id === currentUser.id) {
-            setCurrentDraft((payload.new as DraftRow)?.content || '');
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [projectId, currentUser?.id]);
+  // Drafts realtime removed; keep client-only. If you add a `drafts` table,
+  // re-enable a realtime channel here similar to messages.
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -188,12 +142,12 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
       const trimmed = content.trim();
       if (!trimmed) return;
 
-      const { error: insertError } = await supabase.from('chat_messages').insert({
+      const { error: insertError } = await supabase.from('messages').insert({
         project_id: projectId,
         user_id: currentUser.id,
-        user_name: currentUser.name,
-        avatar: currentUser.avatar,
-        content: trimmed
+        content: trimmed,
+        timestamp: new Date().toISOString(),
+        type: 'text'
       });
 
       if (insertError) {
@@ -201,10 +155,6 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
         return;
       }
 
-      await supabase
-        .from('chat_drafts')
-        .delete()
-        .match({ project_id: projectId, user_id: currentUser.id });
       setCurrentDraft('');
     },
     [projectId, currentUser?.id]
@@ -217,7 +167,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
       if (!trimmed) return false;
 
       const { error: updateError } = await supabase
-        .from('chat_messages')
+        .from('messages')
         .update({ content: trimmed, edited_at: new Date().toISOString() })
         .match({ id: messageId, user_id: currentUser.id, project_id: projectId });
 
@@ -235,26 +185,7 @@ export const useRealtimeChat = (projectId: string | null, currentUser: User | nu
     async (value: string) => {
       setCurrentDraft(value);
       if (!projectId || !currentUser || !supabase || !isSupabaseConfigured) return;
-
-      const trimmed = value.trim();
-      if (!trimmed) {
-        await supabase
-          .from('chat_drafts')
-          .delete()
-          .match({ project_id: projectId, user_id: currentUser.id });
-        return;
-      }
-
-      await supabase.from('chat_drafts').upsert(
-        {
-          project_id: projectId,
-          user_id: currentUser.id,
-          user_name: currentUser.name,
-          content: value,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'project_id,user_id' }
-      );
+      // Keep drafts client-side only for now.
     },
     [projectId, currentUser?.id]
   );
