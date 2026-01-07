@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { supabase, isSupabaseConfigured, CONFIG_ERROR_MESSAGE } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, CONFIG_ERROR_MESSAGE, authEmailRedirectTo } from '../lib/supabase';
 
 export const useAuth = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -114,6 +114,7 @@ export const useAuth = () => {
         email,
         password,
         options: {
+          emailRedirectTo: authEmailRedirectTo,
           data: {
             full_name: name,
           }
