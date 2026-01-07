@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Schmer | Engineering Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+            },
+            colors: {
+              slate: {
+                850: '#111827',
+                900: '#0b1120',
+                950: '#030712',
+              },
+              blue: {
+                500: '#3b82f6',
+                600: '#2563eb',
+              }
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+        overflow-x: hidden;
+      }
+      
+      .dark body {
+        background-color: #030712;
+      }
+
+      .blueprint-bg {
+        background-image: radial-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+        background-size: 32px 32px;
+      }
+
+      .dark .blueprint-bg {
+        background-image: radial-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px);
+      }
+
+      ::-webkit-scrollbar {
+        width: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #1e293b;
+      }
+
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+      }
+      
+      .dark .glass-card {
+        background: rgba(11, 17, 32, 0.7);
+        border: 1px solid rgba(30, 41, 59, 0.5);
+      }
+
+      .tech-border {
+        border: 1px solid transparent;
+        background-image: linear-gradient(white, white), linear-gradient(to right, #3b82f6, #6366f1);
+        background-origin: border-box;
+        background-clip: padding-box, border-box;
+      }
+
+      .dark .tech-border {
+        background-image: linear-gradient(#0b1120, #0b1120), linear-gradient(to right, #1d4ed8, #4338ca);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.49.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300 antialiased">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
